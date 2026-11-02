@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Saved Deals</title>
+  <style>
+    :root {
+      --bg: #f5f5f7;
+      --card: #ffffff;
+      --text: #1d1d1f;
+      --muted: #6e6e73;
+      --accent: #0071e3;
+      --accent-hover: #0077ed;
+      --danger: #ff3b30;
+      --border: #d2d2d7;
+      --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      --radius: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.4;
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--card);
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    header h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 500;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-secondary {
+      background: #e8e8ed;
+      color: var(--text);
+    }
+
+    .btn-secondary:hover {
+      background: #dcdce0;
+    }
+
+    .btn-danger {
+      background: transparent;
+      color: var(--danger);
+      border: 1px solid var(--danger);
+    }
+
+    main {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 20px 16px 40px;
+    }
+
+    /* Loading state */
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 20px;
+      gap: 16px;
+      color: var(--muted);
+    }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Empty state */
+    .empty {
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--muted);
+    }
+
+    .empty h2 {
+      font-size: 1.1rem;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+
+    /* Deal list */
+    .deal-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .deal-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      border: 1px solid transparent;
+    }
+
+    .deal-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .deal-card:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .deal-name {
+      font-weight: 600;
+      font-size: 1rem;
+      margin-bottom: 8px;
+    }
+
+    .price-row {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .current-price {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .original-price {
+      font-size: 0.95rem;
+      color: var(--muted);
+      text-decoration: line-through;
+    }
+
+    .percent-off {
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: #e8f5e9;
+      color: #2e7d32;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 100;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s ease, visibility 0.2s ease;
+    }
+
+    .modal-overlay.open {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal {
+      background: var(--card);
+      width: 100%;
+      max-width: 480px;
+      border-radius: 16px 16px 0 0;
+      padding: 24px 20px 32px;
+      transform: translateY(100%);
+      transition: transform 0.25s ease;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-overlay.open .modal {
+      transform: translateY(0);
+    }
+
+    @media (min-width: 520px) {
+      .modal-overlay {
+        align-items: center;
+      }
+      .modal {
+        border-radius: 16px;
+        transform: translateY(20px) scale(0.98);
+      }
+      .modal-overlay.open .modal {
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+
+    .modal-title {
+      font-size: 1.2rem;
+      font-weight: 600;
+      padding-right: 12px;
+    }
+
+    .close-btn {
+      background: #e8e8ed;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .close-btn:hover {
+      background: #dcdce0;
+    }
+
+    .modal-prices {
+      margin-bottom: 24px;
+    }
+
+    .notify-section {
+      border-top: 1px solid var(--border);
+      padding-top: 20px;
+    }
+
+    .notify-section label {
+      display: block;
+      font-size: 0.9rem;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .input-row input {
+      flex: 1;
+      font-size: 1rem;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: inherit;
+    }
+
+    .input-row input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.2);
+    }
+
+    .notify-feedback {
+      margin-top: 12px;
+      font-size: 0.875rem;
+      min-height: 1.25em;
+    }
+
+    .notify-feedback.success {
+      color: #2e7d32;
+    }
+
+    .notify-feedback.error {
+      color: var(--danger);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Saved Deals</h1>
+    <div class="controls">
+      <button class="btn-secondary" id="toggleEmptyBtn" type="button">Show Empty</button>
+      <button class="btn-secondary" id="reloadBtn" type="button">Reload</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Loading state -->
+    <div id="loadingState" class="loading">
+      <div class="spinner" aria-hidden="true"></div>
+      <p>Loading your saved deals…</p>
+    </div>
+
+    <!-- Empty state -->
+    <div id="emptyState" class="empty hidden">
+      <h2>No saved deals</h2>
+      <p>When you save deals they’ll show up here.</p>
+      <br />
+      <button class="btn-primary" id="loadDealsBtn" type="button">Load sample deals</button>
+    </div>
+
+    <!-- List -->
+    <div id="dealList" class="deal-list hidden" role="list"></div>
+  </main>
+
+  <!-- Detail modal -->
+  <div id="modalOverlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modalTitle" class="modal-title"></h2>
+        <button class="close-btn" id="closeModalBtn" type="button" aria-label="Close">×</button>
+      </div>
+
+      <div class="modal-prices">
+        <div class="price-row">
+          <span id="modalCurrent" class="current-price"></span>
+          <span id="modalOriginal" class="original-price"></span>
+          <span id="modalPercent" class="percent-off"></span>
+        </div>
+      </div>
+
+      <div class="notify-section">
+        <label for="notifyPrice">Notify me when this drops below</label>
+        <div class="input-row">
+          <input
+            type="number"
+            id="notifyPrice"
+            min="0"
+            step="0.01"
+            placeholder="e.g. 49.99"
+            inputmode="decimal"
+          />
+          <button class="btn-primary" id="notifyBtn" type="button">Notify me</button>
+        </div>
+        <p id="notifyFeedback" class="notify-feedback" aria-live="polite"></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------- Mock data ----------
+    const MOCK_DEALS = [
+      {
+        id: 1,
+        name: "Sony WH-1000XM5 Wireless Headphones",
+        currentPrice: 298.00,
+        originalPrice: 399.99
+      },
+      {
+        id: 2,
+        name: "Apple AirPods Pro (2nd Gen)",
+        currentPrice: 189.99,
+        originalPrice: 249.00
+      },
+      {
+        id: 3,
+        name: "Samsung 65\" QLED 4K Smart TV",
+        currentPrice: 797.99,
+        originalPrice: 1297.99
+      },
+      {
+        id: 4,
+        name: "Ninja Creami Ice Cream Maker",
+        currentPrice: 169.99,
+        originalPrice: 229.99
+      },
+      {
+        id: 5,
+        name: "Kindle Paperwhite (16 GB)",
+        currentPrice: 119.99,
+        originalPrice: 149.99
+      }
+    ];
+
+    // ---------- State ----------
+    let deals = [];
+    let isLoading = true;
+    let selectedDeal = null;
+
+    // ---------- DOM refs ----------
+    const loadingState = document.getElementById("loadingState");
+    const emptyState = document.getElementById("emptyState");
+    const dealList = document.getElementById("dealList");
+    const modalOverlay = document.getElementById("modalOverlay");
+    const modalTitle = document.getElementById("modalTitle");
+    const modalCurrent = document.getElementById("modalCurrent");
+    const modalOriginal = document.getElementById("modalOriginal");
+    const modalPercent = document.getElementById("modalPercent");
+    const notifyPriceInput = document.getElementById("notifyPrice");
+    const notifyFeedback = document.getElementById("notifyFeedback");
+    const closeModalBtn = document.getElementById("closeModalBtn");
+    const notifyBtn = document.getElementById("notifyBtn");
+    const reloadBtn = document.getElementById("reloadBtn");
+    const toggleEmptyBtn = document.getElementById("toggleEmptyBtn");
+    const loadDealsBtn = document.getElementById("loadDealsBtn");
+
+    // ---------- Helpers ----------
+    function formatPrice(value) {
+      return "$" + value.toFixed(2);
+    }
+
+    function calcPercentOff(current, original) {
+      if (original <= 0) return 0;
+      return Math.round(((original - current) / original) * 100);
+    }
+
+    function showLoading() {
+      isLoading = true;
+      loadingState.classList.remove("hidden");
+      emptyState.classList.add("hidden");
+      dealList.classList.add("hidden");
+    }
+
+    function render() {
+      loadingState.classList.add("hidden");
+
+      if (deals.length === 0) {
+        emptyState.classList.remove("hidden");
+        dealList.classList.add("hidden");
+        return;
+      }
+
+      emptyState.classList.add("hidden");
+      dealList.classList.remove("hidden");
+      dealList.innerHTML = "";
+
+      deals.forEach((deal) => {
+        const percent = calcPercentOff(deal.currentPrice, deal.originalPrice);
+        const card = document.createElement("article");
+        card.className = "deal-card";
+        card.setAttribute("role", "listitem");
+        card.tabIndex = 0;
+        card.dataset.id = deal.id;
+
+        card.innerHTML = `
+          <div class="deal-name">${deal.name}</div>
+          <div class="price-row">
+            <span class="current-price">${formatPrice(deal.currentPrice)}</span>
+            <span class="original-price">${formatPrice(deal.originalPrice)}</span>
+            <span class="percent-off">${percent}% off</span>
+          </div>
+        `;
+
+        card.addEventListener("click", () => openModal(deal));
+        card.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openModal(deal);
+          }
+        });
+
+        dealList.appendChild(card);
+      });
+    }
+
+    function openModal(deal) {
+      selectedDeal = deal;
+      const percent = calcPercentOff(deal.currentPrice, deal.originalPrice);
+
+      modalTitle.textContent = deal.name;
+      modalCurrent.textContent = formatPrice(deal.currentPrice);
+      modalOriginal.textContent = formatPrice(deal.originalPrice);
+      modalPercent.textContent = percent + "% off";
+
+      // Sensible default: slightly below current price
+      notifyPriceInput.value = (deal.currentPrice - 10).toFixed(2);
+      notifyFeedback.textContent = "";
+      notifyFeedback.className = "notify-feedback";
+
+      modalOverlay.classList.add("open");
+      notifyPriceInput.focus();
+    }
+
+    function closeModal() {
+      modalOverlay.classList.remove("open");
+      selectedDeal = null;
+    }
+
+    function loadDeals(simulateEmpty = false) {
+      showLoading();
+
+      // Simulate network delay
+      setTimeout(() => {
+        isLoading = false;
+        deals = simulateEmpty ? [] : [...MOCK_DEALS];
+        render();
+      }, 900);
+    }
+
+    // ---------- Event listeners ----------
+    closeModalBtn.addEventListener("click", closeModal);
+
+    modalOverlay.addEventListener("click", (e) => {
+      if (e.target === modalOverlay) closeModal();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && modalOverlay.classList.contains("open")) {
+        closeModal();
+      }
+    });
+
+    notifyBtn.addEventListener("click", () => {
+      const value = parseFloat(notifyPriceInput.value);
+
+      if (isNaN(value) || value <= 0) {
+        notifyFeedback.textContent = "Please enter a valid price greater than $0.";
+        notifyFeedback.className = "notify-feedback error";
+        return;
+      }
+
+      if (selectedDeal && value >= selectedDeal.currentPrice) {
+        notifyFeedback.textContent = "Price should be below the current price to be useful.";
+        notifyFeedback.className = "notify-feedback error";
+        return;
+      }
+
+      // In a real app this would call an API
+      notifyFeedback.textContent = `Got it! We'll notify you when the price drops below ${formatPrice(value)}.`;
+      notifyFeedback.className = "notify-feedback success";
+    });
+
+    reloadBtn.addEventListener("click", () => loadDeals(false));
+    toggleEmptyBtn.addEventListener("click", () => loadDeals(true));
+    loadDealsBtn.addEventListener("click", () => loadDeals(false));
+
+    // ---------- Init ----------
+    loadDeals(false);
+  </script>
+</body>
+</html>
